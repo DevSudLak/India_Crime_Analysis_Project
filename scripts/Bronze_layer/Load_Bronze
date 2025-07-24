@@ -1,0 +1,46 @@
+-- /////////////////////////////////////////////////////////////////
+-- Procedure Name  : bronze.load_bronze
+-- Purpose         : Load raw CSV data into the Bronze layer table
+-- Description     : 
+--      This procedure truncates the existing data in the Bronze table
+--      and loads fresh records from a local CSV file using BULK INSERT.
+--      Errors during loading are handled gracefully and logged.
+-- /////////////////////////////////////////////////////////////////
+
+CREATE OR ALTER PROCEDURE bronze.load_bronze
+AS
+BEGIN
+    DECLARE @ProcessStart DATETIME = GETDATE();
+    PRINT '>>> [Bronze Load] Starting process at: ' + CONVERT(NVARCHAR, @ProcessStart, 120);
+
+    BEGIN TRY
+        PRINT '>>> Step 1: Cleaning up previous data from bronze.CrimeReports';
+        TRUNCATE TABLE bronze.CrimeReports;
+
+        PRINT '>>> Step 2: Importing new data from CSV file';
+        BULK INSERT bronze.CrimeReports
+        FROM 'C:\Users\shubh\Downloads\crime_dataset_india.csv'
+        WITH (
+            FORMAT = 'CSV',
+            FIRSTROW = 2,
+            FIELDTERMINATOR = ',',
+            ROWTERMINATOR = '\n',
+            TABLOCK
+            -- Uncomment this for debugging row issues:
+            --, ERRORFILE = 'C:\Users\shubh\Downloads\bulk_error_log.txt'
+        );
+
+        PRINT '>>> Step 3: Data loaded successfully into Bronze layer';
+    END TRY
+    BEGIN CATCH
+        PRINT '*** [Bronze Load] Something went wrong!';
+        PRINT '>> Error Number   : ' + CAST(ERROR_NUMBER() AS NVARCHAR(10));
+        PRINT '>> Error Severity : ' + CAST(ERROR_SEVERITY() AS NVARCHAR(10));
+        PRINT '>> Error Line     : ' + CAST(ERROR_LINE() AS NVARCHAR(10));
+        PRINT '>> Error Message  : ' + ERROR_MESSAGE();
+    END CATCH
+
+    DECLARE @ProcessEnd DATETIME = GETDATE();
+    PRINT '>>> [Bronze Load] Finished at: ' + CONVERT(NVARCHAR, @ProcessEnd, 120);
+    PRINT '>>> Total Duration (seconds): ' + CAST(DATEDIFF(SECOND, @ProcessStart, @ProcessEnd) AS NVARCHAR);
+END;
